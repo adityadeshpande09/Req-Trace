@@ -5,6 +5,10 @@ import HomeView from './pages/HomeView';
 import AboutView from './pages/AboutView';
 import SettingsView from './pages/SettingsView';
 import HelpView from './pages/HelpView';
+import SessionsView from './pages/SessionsView';
+import GraphComparisonView from './pages/GraphComparisonView';
+import CustomViewsView from './pages/CustomViewsView';
+import DocumentsView from './pages/DocumentsView';
 import { mockGraphData } from './utils/mockData';
 
 function App() {
@@ -51,6 +55,18 @@ function App() {
     }, 500);
   };
 
+  const handleLoadSession = ({ messages, graphData, transcriptId }) => {
+    if (messages) setMessages(messages);
+    if (graphData) setGraphData(graphData);
+    if (transcriptId) setTranscriptId(transcriptId);
+    setGraphReady(true);
+  };
+
+  const handleApplyView = ({ activeFilters, layoutConfig, nodePositions }) => {
+    // This can be passed to GraphVisualization component if needed
+    console.log('Applying view:', { activeFilters, layoutConfig, nodePositions });
+  };
+
   return (
     <div className="flex h-screen bg-gray-900 text-gray-100">
       <Sidebar
@@ -77,6 +93,29 @@ function App() {
               transcriptId={transcriptId} 
               messages={messages} 
               onSendMessage={handleSendMessage} 
+            />
+          )}
+          {activeView === 'sessions' && (
+            <SessionsView
+              currentMessages={messages}
+              currentGraphData={graphData}
+              currentTranscriptId={transcriptId}
+              onLoadSession={handleLoadSession}
+            />
+          )}
+          {activeView === 'comparison' && (
+            <GraphComparisonView currentGraphData={graphData} />
+          )}
+          {activeView === 'views' && (
+            <CustomViewsView
+              currentGraphData={graphData}
+              onApplyView={handleApplyView}
+            />
+          )}
+          {activeView === 'documents' && (
+            <DocumentsView
+              currentGraphData={graphData}
+              currentMessages={messages}
             />
           )}
           {activeView === 'about' && <AboutView />}

@@ -1,9 +1,13 @@
 import React from 'react';
-import { Home, Network, Settings, HelpCircle } from 'lucide-react';
+import { Home, Network, Settings, HelpCircle, FileText, GitCompare, Eye, Save } from 'lucide-react';
 
 function TopNav({ activeView, setActiveView }) {
   const navItems = [
     { id: 'home', label: 'Home', icon: Home },
+    { id: 'sessions', label: 'Sessions', icon: Save },
+    { id: 'comparison', label: 'Comparison', icon: GitCompare },
+    { id: 'views', label: 'Views', icon: Eye },
+    { id: 'documents', label: 'Documents', icon: FileText },
     { id: 'about', label: 'About', icon: Network },
     { id: 'settings', label: 'Settings', icon: Settings },
     { id: 'help', label: 'Help', icon: HelpCircle },
