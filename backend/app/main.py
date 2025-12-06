@@ -12,6 +12,10 @@ from app.api.v1 import (
     routes_stats,
     routes_health,
     routes_transcribe,
+    routes_sessions,
+    routes_graph_comparison,
+    routes_views,
+    routes_documents,
 )
 # ✅ Explicitly point to backend/.env no matter where uvicorn is started
 dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
@@ -50,6 +54,10 @@ app.include_router(routes_graph.router, prefix="", tags=["graph"])
 # app.include_router(routes_stats.router, prefix="/stats", tags=["stats"])
 app.include_router(routes_health.router, prefix="/health", tags=["health"])
 app.include_router(routes_transcribe.router, prefix="/transcribe", tags=["transcribe"])
+app.include_router(routes_sessions.router, tags=["sessions"])
+app.include_router(routes_graph_comparison.router, tags=["graph-comparison"])
+app.include_router(routes_views.router, tags=["views"])
+app.include_router(routes_documents.router, tags=["documents"])
 
 # --------------------------------------------------------
 # Root endpoint
