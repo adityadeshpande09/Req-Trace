@@ -125,7 +125,6 @@ All 3 are in one workflow ```lint.yml```
 ## Support & Contact
 - [GitHub isses](https://github.com/tiva710/SE_Project_2/issues)
 - [Support Form](https://docs.google.com/forms/d/e/1FAIpQLSfnR0p3P9GXqE0vYL3POOB-4eRcw-czH4RW3DlPySVc50C3LQ/viewform)
-
 --- 
 
 ## Licence & Citation 
