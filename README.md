@@ -23,7 +23,7 @@ For detailed use cases, see [USE_CASES.md](docs/USE_CASES.md)
 - **NER-driven Graph Build:** NER on transcripts extracts entities to create nodes/edges  
 - **Graph Visualisation:** Neo4j + React Flow (nodes: Req/Feat/Test/Stakeholder; edges: depends/validates/owns)  
 
-### Future Milestones (November)
+### Milestones Implemented in Proj3 (November)
 - **Save/Load Conversation Sessions**
   - Session versioning  
   - Resume interrupted conversations  
