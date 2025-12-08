@@ -142,23 +142,31 @@ def search_similar_transcripts(query, top_k=3):
             entry = metadata[idx]
             similarity_score = 1.0 / (1.0 + distances[0][i])  # Convert distance to similarity
             
-            # Recency score: prioritize newer uploads
+            # Recency score: aggressively prioritize newer uploads
             recency_score = 1.0
             if 'timestamp' in entry:
                 try:
                     entry_time = datetime.strptime(entry['timestamp'], "%Y-%m-%d %H:%M:%S")
                     current_time = datetime.now()
                     hours_ago = (current_time - entry_time).total_seconds() / 3600
-                    # Boost recent uploads (within last 24 hours get significant boost)
-                    if hours_ago < 24:
-                        recency_score = 1.5  # 50% boost for recent uploads
+                    minutes_ago = (current_time - entry_time).total_seconds() / 60
+                    
+                    # Much stronger boost for very recent uploads
+                    if minutes_ago < 60:  # Within last hour - maximum boost
+                        recency_score = 3.0  # 200% boost for very recent uploads
+                    elif hours_ago < 24:  # Within last 24 hours
+                        recency_score = 2.0  # 100% boost for recent uploads
                     elif hours_ago < 168:  # Within a week
-                        recency_score = 1.2  # 20% boost
-                except:
+                        recency_score = 1.5  # 50% boost
+                    else:
+                        recency_score = 0.8  # Slight penalty for very old files
+                except Exception as e:
+                    # If timestamp parsing fails, check if entry has a very recent conversation_id
+                    # (new uploads might not have timestamp yet)
                     pass
             
-            # Combined score: 70% similarity, 30% recency
-            combined_score = 0.7 * similarity_score + 0.3 * recency_score
+            # Combined score: 60% similarity, 40% recency (increased recency weight)
+            combined_score = 0.6 * similarity_score + 0.4 * recency_score
             candidates.append((combined_score, entry))
     
     # Sort by combined score and return top_k
