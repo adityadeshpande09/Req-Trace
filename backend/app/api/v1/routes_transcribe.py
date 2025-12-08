@@ -26,7 +26,14 @@ from app.services.neo4j_service import (
 )
 
 router = APIRouter(tags=["Transcription"])
-model = whisper.load_model("tiny")
+_model = None
+
+def get_whisper_model():
+    """Lazy load Whisper model only when needed."""
+    global _model
+    if _model is None:
+        _model = whisper.load_model("tiny")
+    return _model
 
 TRANSCRIPTIONS = []
 
@@ -59,6 +66,7 @@ async def transcribe_audio(file: UploadFile = File(...)):
         audio_id = hashlib.sha256(audio_bytes).hexdigest()
 
         # Transcribe
+        model = get_whisper_model()
         result = model.transcribe(tmp_path)
         text = result.get("text", "").strip()
         print(text)

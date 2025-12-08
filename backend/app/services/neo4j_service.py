@@ -7,21 +7,22 @@ import os
 
 load_dotenv(".env")
 
-# Read credentials from environment
-NEO4J_URI = os.getenv("NEO4J_URI", "").strip()
-NEO4J_USER = os.getenv("NEO4J_USER", "").strip()
-NEO4J_PASS = os.getenv("NEO4J_PASS", "").strip()
-
-if not (NEO4J_URI and NEO4J_USER and NEO4J_PASS):
-    raise RuntimeError(
-        "Missing Neo4j credentials. Ensure NEO4J_URI, NEO4J_USER, NEO4J_PASS are set in your project .env."
-    )
-
 _driver: Driver | None = None
 
 def get_driver() -> Driver:
+    """Lazy initialization of Neo4j driver - only connects when actually needed."""
     global _driver
     if _driver is None:
+        # Read credentials from environment only when needed
+        NEO4J_URI = os.getenv("NEO4J_URI", "").strip()
+        NEO4J_USER = os.getenv("NEO4J_USER", "").strip()
+        NEO4J_PASS = os.getenv("NEO4J_PASS", "").strip()
+
+        if not (NEO4J_URI and NEO4J_USER and NEO4J_PASS):
+            raise RuntimeError(
+                "Missing Neo4j credentials. Ensure NEO4J_URI, NEO4J_USER, NEO4J_PASS are set in your project .env."
+            )
+        
         _driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
     return _driver
 
