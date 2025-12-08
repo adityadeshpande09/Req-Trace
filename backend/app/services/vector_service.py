@@ -119,6 +119,7 @@ def add_transcription_to_faiss(entry):
 # ======================================================
 def search_similar_transcripts(query, top_k=3):
     global index, metadata, _initialized
+    from datetime import datetime
     
     # Ensure initialization happened first
     if not _initialized:
@@ -129,10 +130,39 @@ def search_similar_transcripts(query, top_k=3):
         return []
 
     query_emb = model.encode([query], convert_to_numpy=True)
-    distances, indices = index.search(np.array(query_emb), top_k)
+    
+    # Search for more candidates than needed to allow recency filtering
+    search_k = min(top_k * 3, len(metadata))  # Get 3x candidates
+    distances, indices = index.search(np.array(query_emb), search_k)
 
-    results = []
-    for idx in indices[0]:
+    # Combine similarity score with recency score
+    candidates = []
+    for i, idx in enumerate(indices[0]):
         if idx < len(metadata):
-            results.append(metadata[idx])
+            entry = metadata[idx]
+            similarity_score = 1.0 / (1.0 + distances[0][i])  # Convert distance to similarity
+            
+            # Recency score: prioritize newer uploads
+            recency_score = 1.0
+            if 'timestamp' in entry:
+                try:
+                    entry_time = datetime.strptime(entry['timestamp'], "%Y-%m-%d %H:%M:%S")
+                    current_time = datetime.now()
+                    hours_ago = (current_time - entry_time).total_seconds() / 3600
+                    # Boost recent uploads (within last 24 hours get significant boost)
+                    if hours_ago < 24:
+                        recency_score = 1.5  # 50% boost for recent uploads
+                    elif hours_ago < 168:  # Within a week
+                        recency_score = 1.2  # 20% boost
+                except:
+                    pass
+            
+            # Combined score: 70% similarity, 30% recency
+            combined_score = 0.7 * similarity_score + 0.3 * recency_score
+            candidates.append((combined_score, entry))
+    
+    # Sort by combined score and return top_k
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    results = [entry for score, entry in candidates[:top_k]]
+    
     return results

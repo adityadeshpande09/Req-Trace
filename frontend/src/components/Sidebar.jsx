@@ -12,7 +12,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
-import axios from 'axios';
+import { api } from '../api';
 
 function Sidebar({ isOpen, onToggle, onClearGraph, onGraphReady, onTranscribeComplete }) {
   const { user, logout } = useAuth();
@@ -35,7 +35,7 @@ function Sidebar({ isOpen, onToggle, onClearGraph, onGraphReady, onTranscribeCom
     formData.append('file', file);
 
     try {
-      const res = await axios.post('http://127.0.0.1:8000/transcribe/transcribe', formData, {
+      const res = await api.post('/transcribe/transcribe', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
@@ -61,15 +61,25 @@ function Sidebar({ isOpen, onToggle, onClearGraph, onGraphReady, onTranscribeCom
         graphData = { nodes: res.data.data.nodes, links: res.data.data.links || [] };
       }
 
+      console.log('Extracted entry:', entry);
       console.log('Extracted graphData:', graphData);
       console.log('Extracted conversationId:', conversationId);
       console.log('Extracted audioId:', audioId);
 
       if (entry) {
-        setTranscriptions((prev) => [entry, ...prev]);
+        console.log('Adding entry to transcriptions:', entry);
+        setTranscriptions((prev) => {
+          const updated = [entry, ...prev];
+          console.log('Updated transcriptions list (length:', updated.length, '):', updated);
+          return updated;
+        });
         alert(`✅ Transcribed: ${file.name}`);
       } else if (res.data.message) {
         alert(`✅ ${res.data.message}`);
+        console.warn('No entry in response, but message exists:', res.data.message);
+      } else if (res.data.error) {
+        console.error('Backend error:', res.data.error);
+        alert(`❌ ${res.data.error}`);
       }
 
       // Always call the callbacks if they exist

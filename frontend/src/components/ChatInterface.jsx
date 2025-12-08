@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import { api } from '../api';
 import { MessageSquare } from 'lucide-react';
 
 function ChatInterface() {
@@ -17,13 +17,9 @@ function ChatInterface() {
     setLoading(true);
 
     try {
-      const res = await axios.post(
-        'http://127.0.0.1:8000/conversation/chat',
-        { query: input },
-        { headers: { 'Content-Type': 'application/json' } }
-      );
+      const res = await api.post('/conversation/chat', { query: input });
 
-      const answer = res.data?.answer || res.data?.error || 'No response from server.';
+      const answer = res.data?.answer || res.data?.detail || res.data?.error || 'No response from server.';
 
       const botMessage = {
         id: Date.now() + 1,
@@ -34,12 +30,34 @@ function ChatInterface() {
       setMessages((prev) => [...prev, botMessage]);
     } catch (error) {
       console.error('Chat error:', error);
+      let errorMessage = '⚠️ Error: Unable to reach backend.';
+      
+      if (error.response) {
+        // Backend responded with an error
+        const status = error.response.status;
+        const detail = error.response.data?.detail || error.response.data?.error || error.response.statusText;
+        
+        if (status === 503) {
+          errorMessage = `⚠️ Rate Limit: ${detail || 'OpenAI API rate limit exceeded. Please wait a moment and try again.'}`;
+        } else if (status === 500) {
+          errorMessage = `⚠️ Server Error: ${detail || 'An error occurred on the server. Please try again.'}`;
+        } else {
+          errorMessage = `⚠️ Error (${status}): ${detail || error.response.statusText}`;
+        }
+      } else if (error.request) {
+        // Request was made but no response received
+        errorMessage = '⚠️ Error: No response from backend. Please check if the server is running on http://localhost:8000';
+      } else {
+        // Error setting up the request
+        errorMessage = `⚠️ Error: ${error.message || 'Failed to send request'}`;
+      }
+      
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now() + 2,
           sender: 'bot',
-          text: '⚠️ Error: Unable to reach backend.',
+          text: errorMessage,
         },
       ]);
     } finally {

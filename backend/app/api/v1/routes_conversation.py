@@ -60,20 +60,51 @@ async def chat_with_context(payload: dict = Body(...)):
         """
 
         # 💬 New OpenAI client interface
-        completion = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a transcript analysis assistant."},
-                {"role": "user", "content": prompt},
-            ],
-        )
+        try:
+            completion = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are a transcript analysis assistant."},
+                    {"role": "user", "content": prompt},
+                ],
+            )
+            answer = completion.choices[0].message.content.strip()
+        except Exception as openai_error:
+            # Handle OpenAI API errors (rate limits, etc.)
+            error_msg = str(openai_error)
+            if "rate limit" in error_msg.lower() or "429" in error_msg:
+                raise HTTPException(
+                    status_code=503,
+                    detail="OpenAI API rate limit exceeded. Please try again in a moment."
+                )
+            elif "authentication" in error_msg.lower() or "401" in error_msg:
+                raise HTTPException(
+                    status_code=500,
+                    detail="OpenAI API authentication error. Please check API key configuration."
+                )
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"OpenAI API error: {error_msg}"
+                )
 
-        answer = completion.choices[0].message.content.strip()
+        # Identify which files were used (for user feedback)
+        files_analyzed = []
+        conversation_ids_used = set()
+        for chunk in similar_chunks:
+            filename = chunk.get("filename", "Unknown")
+            conv_id = chunk.get("conversation_id")
+            if filename not in files_analyzed:
+                files_analyzed.append(filename)
+            if conv_id:
+                conversation_ids_used.add(conv_id)
 
         return {
             "query": query,
             "answer": answer,
             "context_used": similar_chunks,
+            "files_analyzed": files_analyzed,
+            "conversation_count": len(conversation_ids_used),
         }
 
     except Exception as e:
