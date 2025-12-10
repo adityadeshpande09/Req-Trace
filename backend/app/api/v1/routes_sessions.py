@@ -196,6 +196,84 @@ def restore_version(session_id: str, version: int):
     _save_session(session)
     return session
 
+def _normalize_node_id(node: Dict[str, Any]) -> str:
+    """Get a consistent ID for a node"""
+    return node.get("id", str(node))
+
+def _normalize_link_id(link: Dict[str, Any]) -> tuple:
+    """Get a consistent ID for a link"""
+    source = link.get("source", "")
+    target = link.get("target", "")
+    if isinstance(source, dict):
+        source = source.get("id", "")
+    if isinstance(target, dict):
+        target = target.get("id", "")
+    return (str(source), str(target), link.get("type", "RELATED_TO"))
+
+def _compare_nodes(nodes1: List[Dict], nodes2: List[Dict]) -> Dict[str, Any]:
+    """Compare two sets of nodes"""
+    nodes1_map = {_normalize_node_id(n): n for n in nodes1}
+    nodes2_map = {_normalize_node_id(n): n for n in nodes2}
+    
+    added = [n for nid, n in nodes2_map.items() if nid not in nodes1_map]
+    removed = [n for nid, n in nodes1_map.items() if nid not in nodes2_map]
+    modified = []
+    unchanged = []
+    
+    for nid in nodes1_map.keys() & nodes2_map.keys():
+        n1, n2 = nodes1_map[nid], nodes2_map[nid]
+        if n1 != n2:
+            modified.append({
+                "id": nid,
+                "old": n1,
+                "new": n2
+            })
+        else:
+            unchanged.append(n1)
+    
+    return {
+        "added": added,
+        "removed": removed,
+        "modified": modified,
+        "unchanged": unchanged,
+        "count_added": len(added),
+        "count_removed": len(removed),
+        "count_modified": len(modified),
+        "count_unchanged": len(unchanged)
+    }
+
+def _compare_links(links1: List[Dict], links2: List[Dict]) -> Dict[str, Any]:
+    """Compare two sets of links"""
+    links1_map = {_normalize_link_id(l): l for l in links1}
+    links2_map = {_normalize_link_id(l): l for l in links2}
+    
+    added = [l for lid, l in links2_map.items() if lid not in links1_map]
+    removed = [l for lid, l in links1_map.items() if lid not in links2_map]
+    modified = []
+    unchanged = []
+    
+    for lid in links1_map.keys() & links2_map.keys():
+        l1, l2 = links1_map[lid], links2_map[lid]
+        if l1 != l2:
+            modified.append({
+                "link": lid,
+                "old": l1,
+                "new": l2
+            })
+        else:
+            unchanged.append(l1)
+    
+    return {
+        "added": added,
+        "removed": removed,
+        "modified": modified,
+        "unchanged": unchanged,
+        "count_added": len(added),
+        "count_removed": len(removed),
+        "count_modified": len(modified),
+        "count_unchanged": len(unchanged)
+    }
+
 @router.post("/compare")
 def compare_sessions(
     session_id1: str = Body(...),
@@ -215,27 +293,50 @@ def compare_sessions(
     only_in_1 = [msg for msg in session1.messages if msg.id not in msg_ids2]
     only_in_2 = [msg for msg in session2.messages if msg.id not in msg_ids1]
     
-    # Compare graph data
+    # Compare graph data using proper comparison logic
     graph_diff = {
         "nodes_added": [],
         "nodes_removed": [],
         "nodes_modified": [],
         "links_added": [],
-        "links_removed": []
+        "links_removed": [],
+        "links_modified": []
     }
     
+    # Calculate similarity score based on graph comparison
+    similarity_score = 0.0
+    
     if session1.graph_data and session2.graph_data:
-        nodes1 = {n.get("id"): n for n in session1.graph_data.get("nodes", [])}
-        nodes2 = {n.get("id"): n for n in session2.graph_data.get("nodes", [])}
+        nodes1 = session1.graph_data.get("nodes", [])
+        nodes2 = session2.graph_data.get("nodes", [])
+        links1 = session1.graph_data.get("links", [])
+        links2 = session2.graph_data.get("links", [])
         
-        graph_diff["nodes_added"] = [n for nid, n in nodes2.items() if nid not in nodes1]
-        graph_diff["nodes_removed"] = [n for nid, n in nodes1.items() if nid not in nodes2]
+        node_diff = _compare_nodes(nodes1, nodes2)
+        link_diff = _compare_links(links1, links2)
         
-        links1 = {(l.get("source"), l.get("target")): l for l in session1.graph_data.get("links", [])}
-        links2 = {(l.get("source"), l.get("target")): l for l in session2.graph_data.get("links", [])}
+        graph_diff["nodes_added"] = node_diff["added"]
+        graph_diff["nodes_removed"] = node_diff["removed"]
+        graph_diff["nodes_modified"] = node_diff["modified"]
+        graph_diff["links_added"] = link_diff["added"]
+        graph_diff["links_removed"] = link_diff["removed"]
+        graph_diff["links_modified"] = link_diff["modified"]
         
-        graph_diff["links_added"] = [l for key, l in links2.items() if key not in links1]
-        graph_diff["links_removed"] = [l for key, l in links1.items() if key not in links2]
+        # Calculate similarity based on graph structure
+        # Similarity = (unchanged nodes + unchanged links) / (total nodes + total links)
+        total_nodes = max(len(nodes1), len(nodes2), 1)
+        total_links = max(len(links1), len(links2), 1)
+        node_similarity = node_diff["count_unchanged"] / total_nodes
+        link_similarity = link_diff["count_unchanged"] / total_links
+        similarity_score = (node_similarity + link_similarity) / 2
+    elif not session1.graph_data and not session2.graph_data:
+        # Both sessions have no graph data - consider them similar if messages match
+        total_messages = max(len(session1.messages), len(session2.messages), 1)
+        common_messages = len(msg_ids1 & msg_ids2)
+        similarity_score = common_messages / total_messages
+    else:
+        # One session has graph data, the other doesn't - very different
+        similarity_score = 0.0
     
     return {
         "session1": {"id": session_id1, "name": session1.name, "version": session1.version},
@@ -243,7 +344,7 @@ def compare_sessions(
         "messages_only_in_1": [msg.dict() for msg in only_in_1],
         "messages_only_in_2": [msg.dict() for msg in only_in_2],
         "graph_differences": graph_diff,
-        "similarity_score": 1.0 - (len(only_in_1) + len(only_in_2)) / max(len(session1.messages) + len(session2.messages), 1)
+        "similarity_score": similarity_score
     }
 
 @router.get("/{session_id}/export")

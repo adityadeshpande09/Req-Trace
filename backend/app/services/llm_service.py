@@ -1,9 +1,15 @@
 from openai import OpenAI
 from app.core.config import settings
+import os
 
-client = OpenAI(api_key=settings.OPENAI_API_KEY)
+# Fallback to environment variable if settings not loaded
+api_key = settings.OPENAI_API_KEY or os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=api_key) if api_key else None
 
 def extract_entities_and_relationships(text: str):
+    if client is None:
+        raise RuntimeError("OpenAI API key not configured. Please set OPENAI_API_KEY in your .env file.")
+    
     prompt = f"""
     You are a requirements engineer. Extract the following from the conversation:
     - Entities: features, stakeholders, constraints

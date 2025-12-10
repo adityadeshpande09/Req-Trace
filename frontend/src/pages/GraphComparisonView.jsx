@@ -1,19 +1,86 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { GitCompare, GitMerge, TrendingUp, Download, Loader2, FileText } from 'lucide-react';
 import GraphVisualization from '../components/GraphVisualization';
+import { api } from '../api';
 
 function GraphComparisonView({ currentGraphData }) {
   const [graph1, setGraph1] = useState(null);
   const [graph2, setGraph2] = useState(null);
+  const [graph1Name, setGraph1Name] = useState('Graph 1');
+  const [graph2Name, setGraph2Name] = useState('Graph 2');
   const [comparisonResult, setComparisonResult] = useState(null);
   const [mergeResult, setMergeResult] = useState(null);
   const [evolutionData, setEvolutionData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('compare');
   const [mergeStrategy, setMergeStrategy] = useState('union');
+  const [sessions, setSessions] = useState([]);
+  const [selectedSession1, setSelectedSession1] = useState('');
+  const [selectedSession2, setSelectedSession2] = useState('');
 
   const API_BASE = 'http://127.0.0.1:8000/api/graph-comparison';
+
+  useEffect(() => {
+    loadSessions();
+  }, []);
+
+  const loadSessions = async () => {
+    try {
+      const res = await api.get('/api/sessions/');
+      setSessions(res.data);
+    } catch (error) {
+      console.error('Error loading sessions:', error);
+    }
+  };
+
+  const loadSessionAsGraph1 = async (sessionId) => {
+    if (!sessionId || sessionId === 'current') {
+      setGraph1(currentGraphData);
+      setGraph1Name('Current Graph');
+      setSelectedSession1('current');
+      return;
+    }
+    
+    try {
+      const res = await api.get(`/api/sessions/${sessionId}`);
+      const session = res.data;
+      if (session.graph_data) {
+        setGraph1(session.graph_data);
+        setGraph1Name(session.name);
+        setSelectedSession1(sessionId);
+      } else {
+        alert('Selected session has no graph data');
+      }
+    } catch (error) {
+      console.error('Error loading session:', error);
+      alert('Failed to load session');
+    }
+  };
+
+  const loadSessionAsGraph2 = async (sessionId) => {
+    if (!sessionId || sessionId === 'current') {
+      setGraph2(currentGraphData);
+      setGraph2Name('Current Graph');
+      setSelectedSession2('current');
+      return;
+    }
+    
+    try {
+      const res = await api.get(`/api/sessions/${sessionId}`);
+      const session = res.data;
+      if (session.graph_data) {
+        setGraph2(session.graph_data);
+        setGraph2Name(session.name);
+        setSelectedSession2(sessionId);
+      } else {
+        alert('Selected session has no graph data');
+      }
+    } catch (error) {
+      console.error('Error loading session:', error);
+      alert('Failed to load session');
+    }
+  };
 
   const compareGraphs = async () => {
     if (!graph1 || !graph2) {
@@ -26,8 +93,8 @@ function GraphComparisonView({ currentGraphData }) {
       const res = await axios.post(`${API_BASE}/compare`, {
         graph1,
         graph2,
-        name1: 'Graph 1',
-        name2: 'Graph 2',
+        name1: graph1Name,
+        name2: graph2Name,
         save: false
       });
       setComparisonResult(res.data);
@@ -96,31 +163,59 @@ function GraphComparisonView({ currentGraphData }) {
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium mb-2">Graph 1</label>
-            <button
-              onClick={() => setGraph1(currentGraphData)}
-              className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded"
-            >
-              Use Current Graph
-            </button>
-            {graph1 && (
-              <p className="text-xs text-gray-400 mt-2">
-                Loaded: {graph1.nodes?.length || 0} nodes, {graph1.links?.length || 0} links
-              </p>
-            )}
+            <div className="space-y-2">
+              <select
+                value={selectedSession1}
+                onChange={(e) => loadSessionAsGraph1(e.target.value)}
+                className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm"
+              >
+                <option value="current">Current Graph</option>
+                <option value="">-- Select Saved Session --</option>
+                {sessions.map((session) => (
+                  <option key={session.session_id} value={session.session_id}>
+                    {session.name} (v{session.version})
+                  </option>
+                ))}
+              </select>
+              {graph1 && (
+                <div className="space-y-1">
+                  <p className="text-xs text-gray-400">
+                    Loaded: {graph1Name}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {graph1.nodes?.length || 0} nodes, {graph1.links?.length || 0} links
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">Graph 2</label>
-            <button
-              onClick={() => setGraph2(currentGraphData)}
-              className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded"
-            >
-              Use Current Graph
-            </button>
-            {graph2 && (
-              <p className="text-xs text-gray-400 mt-2">
-                Loaded: {graph2.nodes?.length || 0} nodes, {graph2.links?.length || 0} links
-              </p>
-            )}
+            <div className="space-y-2">
+              <select
+                value={selectedSession2}
+                onChange={(e) => loadSessionAsGraph2(e.target.value)}
+                className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm"
+              >
+                <option value="current">Current Graph</option>
+                <option value="">-- Select Saved Session --</option>
+                {sessions.map((session) => (
+                  <option key={session.session_id} value={session.session_id}>
+                    {session.name} (v{session.version})
+                  </option>
+                ))}
+              </select>
+              {graph2 && (
+                <div className="space-y-1">
+                  <p className="text-xs text-gray-400">
+                    Loaded: {graph2Name}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {graph2.nodes?.length || 0} nodes, {graph2.links?.length || 0} links
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

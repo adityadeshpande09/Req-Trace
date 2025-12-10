@@ -6,7 +6,7 @@ export const api = axios.create({
   baseURL: API_BASE,
   headers: { Accept: 'application/json' },
   withCredentials: true,
-  timeout: 15000,
+  timeout: 180000, // 180 seconds (3 minutes) for file uploads/transcription
 });
 
 api.interceptors.response.use(

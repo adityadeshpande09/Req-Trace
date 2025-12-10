@@ -26,7 +26,17 @@ from app.services.neo4j_service import (
 )
 
 router = APIRouter(tags=["Transcription"])
-model = whisper.load_model("tiny")
+_model = None
+
+def get_whisper_model():
+    """Lazy load Whisper model only when needed."""
+    global _model
+    if _model is None:
+        # Handle SSL certificate issues for model download
+        import ssl
+        ssl._create_default_https_context = ssl._create_unverified_context
+        _model = whisper.load_model("tiny")
+    return _model
 
 TRANSCRIPTIONS = []
 
@@ -59,6 +69,7 @@ async def transcribe_audio(file: UploadFile = File(...)):
         audio_id = hashlib.sha256(audio_bytes).hexdigest()
 
         # Transcribe
+        model = get_whisper_model()
         result = model.transcribe(tmp_path)
         text = result.get("text", "").strip()
         print(text)
@@ -70,7 +81,12 @@ async def transcribe_audio(file: UploadFile = File(...)):
             pass
 
         # CHECK: Does this audio_id already exist in Neo4j?
-        existing_recording_id = recording_exists_by_audio_id(audio_id)
+        existing_recording_id = None
+        try:
+            existing_recording_id = recording_exists_by_audio_id(audio_id)
+        except Exception as neo4j_check_error:
+            print(f"⚠️ Could not check Neo4j for duplicates: {neo4j_check_error}")
+            # Continue with processing - Neo4j is optional
 
         if existing_recording_id:
             # Audio already processed globally – fetch graph and return immediately
@@ -163,8 +179,13 @@ async def transcribe_audio(file: UploadFile = File(...)):
             print(f"⚠️ Could not update FAISS index: {e}")
 
         # IMPORTANT: Fetch the graph data for the new recording
-        graph_data = fetch_graph_for_recording(conversation_id)
-        print(f"📊 Fetched graph data for new recording: {len(graph_data.get('nodes', []))} nodes")
+        graph_data = {"nodes": [], "links": []}
+        try:
+            graph_data = fetch_graph_for_recording(conversation_id)
+            print(f"📊 Fetched graph data for new recording: {len(graph_data.get('nodes', []))} nodes")
+        except Exception as graph_fetch_error:
+            print(f"⚠️ Could not fetch graph data from Neo4j: {graph_fetch_error}")
+            # Continue without graph data - Neo4j is optional
 
         return {
             "message": f"✅ Transcription successful for {file.filename}",
